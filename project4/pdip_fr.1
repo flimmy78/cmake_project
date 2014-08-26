@@ -1,0 +1,261 @@
+.\" Formater ce fichier par la commande :
+.\" groff -man -Tlatin1 pdip.1  (si vous avez saisi des accents Iso-8859-1)
+.\" groff -man -Tascii  pdip.1  (cas general )
+.\"
+.TH PDIP 1 "JANVIER 2010" Linux "Commandes Utilisateur"
+.SH NOM
+pdip \- Dialogue programme avec des programmes interactifs
+.SH SYNOPSIS
+.B pdip [ -s 
+.I fichier-cmd
+.B  ] [ -b 
+.I taille-buffer
+.B  ] [ -d
+.I niveau
+.B ] [ -h ] [ -V ] [ -e ] [ -t ] [ -o ]
+.B --
+.I commande
+options parametres...
+
+.SH DESCRIPTION
+.B pdip
+est une version simplifiee de l'utilitaire
+.BR expect (1).
+L'acronyme PDIP lui-meme vient des premieres lignes du manuel de
+.BR expect (1).
+Comme
+.BR expect (1),
+il interprete un script de commandes pour dialoguer avec un programme interactif comme le ferait
+un operateur humain. Mais il n'a pas toutes les possibilites de
+.BR expect (1)
+qui est capable d'interagir avec plusieurs programmes en meme temps, accepte un langage de commandes
+de haut niveau offrant les branchements et des structures de controle de haut niveau ou de redonner
+le controle a l'operateur en cours de session.
+.BR pdip (1)
+accepte un langage tres simple en entree pour fournir des fonctions de base :
+.RS
+.TP 2
+\(bu
+Filtrage de la sortie du programme pour se caler sur une chaine de caracteres se conformant a un modele
+.TP 2
+\(bu
+Envoi de chaines de caracteres au programme
+.TP 2
+\(bu
+Arret des interactions avec le programme pendant une duree donnee en secondes
+.RE
+.PP
+La commande a lancer avec ses options et parametres est specifiee a la fin de la ligne de commande. Si des options sont
+passees a
+.BR pdip (1)
+et/ou a la commande, alors la commande doit etre precedee d'un double tiret (--). Sinon
+les options seront toutes passees a
+.BR pdip (1)
+et entraineront des erreurs.
+
+.SH USAGE
+.BR pdip (1)
+lit
+.I fichier-cmd
+ou son entree standard (defaut) et accepte les commandes suivantes:
+
+.TP 6
+.BI #...
+# et les mots suivants jusqu'a la fin de la ligne sont ignores (utilise pour les commentaires)
+
+.TP
+.BI "dbg niveau"
+Positionne le niveau du mode mise au point a
+.BR "niveau".
+Plus le
+.BR "niveau",
+est grand, plus vous obtenez des traces. La valeur 0 desactive le mode mise au point.
+
+.TP
+.BI "timeout x"
+Positionne a
+.B x
+secondes le temps maximum a attendre sur une commande
+.BR "recv".
+La valeur 0 désactive le temporisateur (comportement par défaut).
+
+.TP
+.BI "recv ""w1 w2..."""
+Attend une ligne venant du programme se conformant au modele
+.B w1 w2...
+Le modele est une expression reguliere se conformant a
+.BR regex (7).
+
+.TP
+.BI "send ""w1 w2..."""
+Envoie la chaine de caracteres
+.B w1 w2...
+au programme.
+
+.TP
+.BI "print ""w1 w2..."""
+affiche la chaine de caracteres
+.B w1 w2...
+sur la sortie standard.
+
+.PP
+Les commandes
+.B send
+et
+.B print
+peuvent contenir les caracteres de controle suivants:
+.nf
+             \\a Cloche
+             \\b Retour arriere
+             \\t Tabulation horizontale
+             \\n Retour a la ligne
+             \\v Tabulation verticale
+             \\f Saut de page
+             \\r Retour chariot
+             \\" Guillemet
+             \\\\ Barre oblique inversee
+             \\[ Echappement
+             \\] Separateur de groupe
+.fi
+
+.TP
+.BI "sleep x"
+Arrete toute activite pendant
+.B x
+secondes
+
+.TP
+.BI exit
+Termine PDIP
+
+.SH OPTIONS
+.IP "-b taille-buffer | --bufsz=taille-buffer"
+Taille en octet du buffer interne (defaut : 512).
+
+.IP "-d | --debug"
+Active le mode mise au point. C'est tres utile pour comprendre pourquoi un script
+ne marche pas comme souhaite. La valeur 0 désactive le mode mise au point.
+
+.IP "-h | --help"
+Affiche l'aide de la commande (sous-ensemble de cette page de manuel).
+
+.IP "-s fichier-cmd | --script=fichier-cmd"
+Script de commandes en entree (defaut : stdin).
+
+.IP "-V | --version"
+Affiche la version du logiciel.
+
+.IP "-e | --error"
+Redirige la sortie erreur du programme controle.
+
+.IP "-t | --term"
+.B pdip
+se comporte en simple terminal en mode ligne.
+
+.IP "-o | --outstand"
+.B pdip
+affiche les donnees en attente a la fin de la session.
+
+.SH EXEMPLES
+L'exemple suivant montre la mise en oeuvre d'une connexion telnet vers
+un hote appele 'remote' sur le port 34570 avec le nom de login 'foo' et le mot de
+passe 'bar'. Comme le numero de port distant est specifie a l'aide d'une option (-p),
+il faut faire preceder la commande d'un double tiret (--).
+Les commandes sont injectees sur l'entree standard. On
+attend le prompt '$' et on lance la commande
+.BR ls (1)
+avant de se deconnecter du shell via la commande
+.BR exit (P).
+.PP
+.nf
+      $ pdip -- telnet -p 34570 remote
+      recv "login"
+      send "foo\\n"   # Nom de login 'foo'
+      recv "Password"
+      send "bar\\n"   # Mot de passe 'bar'
+      recv "\\$ "     # Inhibition du caractere special '$' avec '\\'
+      send "ls\\n"    # Lance la commande 'ls'
+      recv "\\$ "
+      send "exit\\n"  # Sortie du shell
+      exit           # Sortie de PDIP
+      $ 
+
+.fi
+L'exemple suivant montre la mise en oeuvre d'une connexion
+.BR ftp (1)
+vers un hote appele 'remote' avec le nom de login 'foo' et le
+mot de passe 'bar'. Les commandes sont injectees sur l'entree standard.
+On attend l'apparition du prompt 'ftp>' en debut de ligne et on lance la
+commande 'help' avant de se deconnecter de
+.BR ftp (1)
+avec la commande 'quit'.
+.PP
+.nf
+      $ pdip ftp remote
+      recv "Name"
+      send "foo\\n"    # Nom de login 'foo'
+      recv "Password"
+      send "bar\\n"    # Mot de passe 'bar'
+      recv "^ftp> "   # Prompt en debut de ligne
+      send "help\\n"   # Lancement de la commande help
+      recv "^ftp> "
+      send "quit\\n"   # Sortie de FTP
+      exit            # Sortie de PDIP
+      $ 
+
+.fi
+L'exemple suivant met en oeuvre une session avec la calculatrice
+.BR bc (1)
+qui a la particularite de ne pas afficher de prompt en debut de
+ligne de commande. On utilise le meta caractere '$' pour se synchroniser
+sur les fins de ligne. Deux operations sont lancees '3+4' et '6*8'.
+Ensuite on quitte
+.BR bc (1).
+.PP
+.nf
+      $ pdip bc
+      recv "warranty"  # Vers la fin de la banniere de demarrage
+      recv "$"         # Fin de la derniere ligne de la banniere
+      send "3+4\\n"
+      recv "$"         # Reception de la fin de ligne de l'echo
+      recv "$"         # Reception de la fin de ligne du resultat
+      send "6*8\\n"
+      recv "$"
+      recv "$"
+      send "quit\\n"   # Sortie de BC
+      exit            # Sortie de PDIP
+      $ 
+
+.fi
+
+L'exemple suivant met en oeuvre une session
+.BR telnet (1)
+vers un hote appele 'remote' avec un nom de login 'foo' et un mot
+de passe 'bar'. Les commandes sont injectees sur l'entree standard.
+Avec une expression reguliere, on attend un prompt de la forme
+"xxxx-<login_name>-pathname> " ou "xxxx-<login_name>-pathname>"
+en debut de ligne.
+Ensuite la commande 'ls -l' est lancee avant de se deconnecter de
+.BR telnet (1)
+avec la commande 'exit'.
+.PP
+.nf
+      $ pdip telnet remote
+      recv "login:"
+      send "foo\\n"                  # Nom de login 'foo'
+      recv "Password:"
+      send "bar\\n"                  # Mot de passe 'bar'
+      recv "^(.)+-foo-(.)+(>|> )$"  # Prompt en debut de ligne
+      send "ls -l\\n"                # Lance la commande 'ls -l'
+      recv "^(.)+-foo-(.)+(>|> )$"
+      send "exit\\n"                 # Sortie de telnet
+      exit                          # Sortie de PDIP
+      $ 
+
+.fi
+
+.SH AUTEUR
+Rachid Koucha (rachid point koucha a free point fr)
+.SH "VOIR AUSSI"
+.BR regex (7),
+.BR expect (1).

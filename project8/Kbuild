@@ -1,0 +1,3 @@
+# Driver for the UDP based Linux console
+obj-m += udpc.o
+udpc-objs := udp_console_k.o

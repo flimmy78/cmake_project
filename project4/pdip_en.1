@@ -1,0 +1,263 @@
+.\" Format this file with the following command :
+.\" groff -man -Tascii  pdip.1  (cas general )
+.\"
+.TH PDIP 1 "JANUARY 2010" Linux "User Commands"
+.SH NAME
+pdip \- Programmed Dialogue with Interactive Programs
+.SH SYNOPSIS
+.B pdip [ -s 
+.I cmdfile
+.B  ] [ -b 
+.I buffer-size
+.B ] [ -d
+.I level
+.B ] [ -h ] [ -V ] [ -e ] [ -t ] [ -o ]
+.B --
+.I command
+options parameters...
+
+.SH DESCRIPTION
+.B pdip
+is a simplified version of the famous
+.BR expect (1)
+utility. The acronym PDIP itself comes from the first lines of the manual of
+.BR expect (1).
+Like
+.BR expect (1),
+it interprets a scripting language to dialog with an interactive program as a human operator would do. But it has not all the bells and whistles of
+.BR expect (1)
+which is able to interact with multiple programs at the same time, accept a high level scripting language providing branching and high level control structures or giving back the control to the operator during a session.
+.BR pdip (1)
+accepts a very simple language on the input to provide basic functions such as:
+.RS
+.TP 2
+\(bu
+Filtering the program's output to catch a string matching a given pattern
+.TP 2
+\(bu
+Sending strings of characters to the program
+.TP 2
+\(bu
+Stopping interactions with the program during a given amount of seconds
+.RE
+.PP
+The command to launch along with its options and parameters are passed at the end of the command line. If options are passed to
+.BR pdip (1)
+and/or the command, then the command must be preceded by a double hyphen (--). Otherwise the options will be passed to
+.BR pdip (1)
+and will trigger errors.
+
+.SH USAGE
+.BR pdip (1)
+reads
+.I cmdfile
+or the standard input (default) and accepts the following commands:
+.TP 6
+.BI #...
+# and the following words up to the end of line are ignored (used for comments)
+
+.TP
+.BI "dbg level"
+Set the debug level to
+.BR "level".
+The higher the
+.BR "level",
+the more traces you get. The value 0 deactivates the debug mode.
+
+.TP
+.BI "timeout x"
+Set to
+.B x
+seconds the maximum time to wait on each
+.B recv
+command (the value 0 cancels the timeout, this is the default).
+
+.TP
+.BI "recv ""w1 w2..."""
+Wait for a line with the pattern
+.B w1 w2...
+from the program. The pattern is a regular expression conforming to
+.BR regex (7).
+
+.TP
+.BI "send ""w1 w2..."""
+Send the string
+.B w1 w2...
+to the program.
+
+.TP
+.BI "print ""w1 w2..."""
+Print the string
+.B w1 w2...
+onto the standard output.
+
+.PP
+For both
+.B send
+and
+.B print
+commands, the string may contain the following control characters:
+
+.nf
+             \\a Bell
+             \\b Backspace
+             \\t Horizontal tabulation
+             \\n New line
+             \\v Vertical tabulation
+             \\f Form feed
+             \\r Carriage return
+             \\" Double quote
+             \\\\ Backslash
+             \\[ Escape
+             \\] Group Separator
+.fi
+.TP
+.BI "sleep x"
+Stop activity during
+.B x
+seconds.
+.TP
+.BI exit
+Terminate PDIP.
+
+.SH OPTIONS
+
+.IP "-b buffer-size | --bufsz=buffer-size"
+Size in bytes of the internal I/O buffer (default: 512).
+
+.IP "-d level | --debug=level"
+Set the debug mode to
+.IR "level".
+The higher the
+.IR "level",
+the more traces you get. It is helpful to understand why a command script
+does not work as expected. The value 0 deactivates the debug mode.
+
+.IP "-h | --help"
+Display the help of the command (subset of this man page).
+
+.IP "-s cmdfile | --script=cmdfile"
+Script of input commands (default stdin).
+
+.IP "-V | --version"
+Display the version of the software.
+
+.IP "-e | --error"
+Redirect error output of the controlled program.
+
+.IP "-t | --term"
+Make
+.B pdip
+behave as a simple line mode terminal.
+
+.IP "-o | --outstand"
+Make
+.B pdip
+print unread data from the controlled program at the end of the session.
+
+.SH EXAMPLES
+The following example shows how to set up a telnet connection to a given
+host called 'remote' on the TCP port 34770 with the login name 'foo' and password 'bar'.
+Since the remote port is specified with an option (-p), it is mandatory to put a double
+hyphen (--) before the command to launch.
+Commands are injected on the standard input. We wait for the '$' prompt
+and launch the
+.BR ls
+command before disconnecting from the shell via the
+.BR exit (P)
+command.
+.PP
+.nf
+      $ pdip -- telnet -p 34770 remote
+      recv "login"
+      send "foo\\n"   # Login name is 'foo'
+      recv "Password"
+      send "bar\\n"   # Password is 'bar'
+      recv "\\$ "     # Inhibition of the metacharacter '$' with '\\'
+      send "ls\\n"    # Launch the 'ls' command
+      recv "\\$ "
+      send "exit\\n"  # Exit from the shell
+      exit           # Exit from PDIP
+      $ 
+
+.fi
+
+The following example shows how to set up a
+.BR ftp (1)
+connection to a given
+host called 'remote' with the login name 'foo' and password 'bar'.
+Commands are injected on the standard input. We wait for the 'ftp>'
+prompt at the beginning of the line and launch the 'help'
+command before disconnecting from
+.BR ftp (1)
+with the 'quit' command.
+.PP
+.nf
+      $ pdip ftp remote
+      recv "Name"
+      send "foo\\n"    # Login name is 'foo'
+      recv "Password"
+      send "bar\\n"    # Password is 'bar'
+      recv "^ftp> "   # Prompt at beginning of line
+      send "help\\n"   # Launch the 'help' command
+      recv "^ftp> "
+      send "quit\\n"   # Terminate FTP
+      exit            # Exit from PDIP
+      $ 
+
+.fi
+The following example shows how to interact with the program
+.BR bc (1)
+which does not display any prompt. We use the metacharacter '$'
+to synchronize on end of lines. Two operations are launched '3+4'
+and '6*8'. Then we quit
+.BR bc (1).
+.PP
+.nf
+      $ pdip bc
+      recv "warranty"  # Near the end of the startup banner
+      recv "$"         # End of last line of the banner
+      send "3+4\\n"
+      recv "$"         # Receive the end of line of the echo
+      recv "$"         # Receive the end of line of the result
+      send "6*8\\n"
+      recv "$"
+      recv "$"
+      send "quit\\n"   # Terminate BC
+      exit            # Exit from PDIP
+      $ 
+
+.fi
+
+The following example shows how to set up a
+.BR telnet (1)
+connection to a given
+host called 'remote' with the login name 'foo' and password 'bar'.
+Commands are injected on the standard input. With a regular expression,
+we wait for the prompt of the form "xxxx-<login_name>-pathname> " or
+"xxxx-<login_name>-pathname>" at the beginning of the line.
+Then we launch the 'ls -l' command before disconnecting from
+.BR telnet (1)
+with the 'exit' command.
+.PP
+.nf
+      $ pdip telnet remote
+      recv "login:"
+      send "foo\\n"                  # Login name is 'foo'
+      recv "Password:"
+      send "bar\\n"                  # Password is 'bar'
+      recv "^(.)+-foo-(.)+(>|> )$"  # Prompt at beginning of line
+      send "ls -l\\n"                # Launch the 'ls -l' command
+      recv "^(.)+-foo-(.)+(>|> )$"
+      send "exit\\n"                 # Terminate telnet
+      exit                          # Exit from PDIP
+      $ 
+
+.fi
+
+
+.SH AUTHOR
+Rachid Koucha (rachid dot koucha at free dot fr)
+.SH "SEE ALSO"
+.BR regex(7),
+.BR expect(1).
